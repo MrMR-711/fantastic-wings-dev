@@ -1,0 +1,41 @@
+package fuzs.fantasticwings.mixin;
+
+import fuzs.fantasticwings.handler.ServerEventHandler;
+import fuzs.fantasticwings.flight.FlightCapability;
+import fuzs.fantasticwings.init.ModRegistry;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.Level;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
+@Mixin(LivingEntity.class)
+abstract class LivingEntityMixin extends Entity {
+
+    public LivingEntityMixin(EntityType<?> entityType, Level level) {
+        super(entityType, level);
+    }
+
+    @Inject(method = "jumpFromGround", at = @At("HEAD"), cancellable = true)
+    private void fantasticwings$preventHoverJump(CallbackInfo callback) {
+        if (ModRegistry.FLIGHT_CAPABILITY.getIfProvided(this).filter(FlightCapability::isHovering).isPresent()) callback.cancel();
+    }
+
+    @Inject(method = "isVisuallySwimming", at = @At("HEAD"), cancellable = true)
+    public void isVisuallySwimming(CallbackInfoReturnable<Boolean> callback) {
+        if (!super.isVisuallySwimming() && ModRegistry.FLIGHT_CAPABILITY.getIfProvided(this).filter(FlightCapability::isFlying).isPresent()) {
+            callback.setReturnValue(false);
+        }
+    }
+
+    @Inject(method = "tickHeadTurn", at = @At("HEAD"), cancellable = true)
+    protected void tickHeadTurn(float yRot, float animStep, CallbackInfoReturnable<Float> callback) {
+        if (ServerEventHandler.onUpdateBodyRotation(LivingEntity.class.cast(this), yRot)) {
+            callback.setReturnValue(0.0F);
+        }
+    }
+}
